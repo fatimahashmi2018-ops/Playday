@@ -1,0 +1,67 @@
+---
+const {
+  workout,
+  isFavorite = false,
+} = Astro.props;
+---
+
+<article class="workout-card">
+
+  <a href={`/workout/${workout.id}`}>
+
+    <div class="workout-card-image">
+
+      <img
+        src={workout.image_path || "/images/workout-placeholder.webp"}
+        alt={workout.title}
+        loading="lazy"
+      />
+
+    </div>
+
+    <div class="workout-card-content">
+
+      <div class="workout-meta">
+
+        <span>{workout.duration_minutes} minutes</span>
+
+        <span>·</span>
+
+        <span>{workout.difficulty}</span>
+
+      </div>
+
+      <h3>{workout.title}</h3>
+
+      <p>{workout.description}</p>
+
+      <div class="workout-meta">
+
+        <span>{workout.category}</span>
+
+        <span>·</span>
+
+        <span>{workout.xp_reward} XP</span>
+
+      </div>
+
+    </div>
+
+  </a>
+
+  <button
+    class="favorite-button"
+    type="button"
+    aria-label={`Save ${workout.title} to favourites`}
+    aria-pressed={isFavorite ? "true" : "false"}
+    data-favorite-id={workout.id}
+  >
+    <img
+      src="/icons/heart.svg"
+      alt=""
+      width="20"
+      height="20"
+    />
+  </button>
+
+</article>

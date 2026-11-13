@@ -1,0 +1,174 @@
+
+---
+import MainLayouts from "../layouts/MainLayouts.astro";
+import { createClient } from "../lib/supabase";
+
+const supabase = createClient({
+  request: Astro.request,
+  cookies: Astro.cookies,
+});
+
+const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (user) {
+  return Astro.redirect("/dashboard");
+}
+---
+
+<MainLayouts title="Log in | PLAYDAY" noIndex>
+  <section class="section">
+    <div class="container auth-container">
+      <div class="auth-card">
+        <p class="eyebrow">WELCOME BACK</p>
+
+        <h1>We missed you. ♡</h1>
+
+        <p>
+          Ready for another tiny win?
+        </p>
+
+        <form id="login-form">
+          <label for="email">Email address</label>
+
+          <input
+            type="email"
+            name="email"
+            id="email"
+            autocomplete="email"
+            required
+          />
+
+          <label for="password">Password</label>
+
+          <input
+            type="password"
+            name="password"
+            id="password"
+            autocomplete="current-password"
+            required
+          />
+
+          <button type="submit" class="button">
+            Log in →
+          </button>
+
+          <p id="auth-message" role="status" aria-live="polite"></p>
+        </form>
+
+        <p>
+          New here?
+          <a href="/signup">Join PLAYDAY</a>
+        </p>
+      </div>
+    </div>
+  </section>
+</MainLayouts>
+
+<script>
+  import { actions } from "astro:actions";
+
+  const form = document.querySelector<HTMLFormElement>("#login-form");
+
+  const message = document.querySelector<HTMLParagraphElement>(
+    "#auth-message"
+  );
+
+  if (!form || !message) {
+    throw new Error("Login form elements could not be found.");
+  }
+
+  const button = form.querySelector<HTMLButtonElement>(
+    'button[type="submit"]'
+  );
+
+  if (!button) {
+    throw new Error("Login button could not be found.");
+  }
+
+  const originalButtonText = "Log in →";
+
+  form.addEventListener("submit", async (event: SubmitEvent) => {
+    event.preventDefault();
+
+    button.disabled = true;
+    button.textContent = "Logging you in...";
+    message.textContent = "";
+
+    try {
+      const formData = new FormData(form);
+
+      const { data, error } = await actions.signIn(formData);
+
+      if (error || !data?.success) {
+        message.textContent =
+          data?.message || "Unable to log in. Please try again.";
+
+        button.disabled = false;
+        button.textContent = originalButtonText;
+
+        return;
+      }
+
+      window.location.href = "/dashboard";
+    } catch (error) {
+      console.error("Login error:", error);
+
+      message.textContent =
+        "Something went wrong. Please try again.";
+
+      button.disabled = false;
+      button.textContent = originalButtonText;
+    }
+  });
+</script>
+
+<style>
+    .auth-container {
+  max-width: 540px;
+}
+
+.auth-card {
+  padding: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: white;
+  box-shadow: var(--shadow-soft);
+}
+
+.auth-card h1 {
+  font-size: 48px;
+}
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.auth-card label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.auth-card button {
+  margin-top: 12px;
+}
+
+.auth-card a {
+  color: var(--color-cherry);
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .auth-card {
+    padding: 25px;
+  }
+
+  .auth-card h1 {
+    font-size: 38px;
+  }
+}
+</style>

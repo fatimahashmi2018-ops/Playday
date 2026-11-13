@@ -1,0 +1,72 @@
+---
+const { workoutId, isFavorite = false } = Astro.props;
+---
+
+<button
+  type="button"
+  class="favorite-button"
+  data-favorite-id={workoutId}
+  aria-pressed={isFavorite ? "true" : "false"}
+  aria-label={isFavorite ? "Remove from favourites" : "Add to favourites"}
+>
+  <span aria-hidden="true">
+    {isFavorite ? "♥" : "♡"}
+  </span>
+</button>
+
+
+<script>
+  import { actions } from "astro:actions";
+
+  document
+    .querySelectorAll<HTMLButtonElement>("[data-favorite-id]")
+    .forEach((button) => {
+      if (button.dataset.favoriteReady === "true") return;
+
+      button.dataset.favoriteReady = "true";
+
+      button.addEventListener("click", async () => {
+        const workoutId = button.dataset.favoriteId;
+
+        if (!workoutId) return;
+
+        button.disabled = true;
+
+        try {
+          const { data, error } = await actions.toggleFavorite({
+            workout_id: workoutId,
+          });
+
+          if (error || !data?.success) {
+            if (data?.message?.toLowerCase().includes("sign in")) {
+              window.location.href = "/login";
+            }
+
+            return;
+          }
+
+          button.setAttribute(
+            "aria-pressed",
+            String(data.favorite)
+          );
+
+          const icon = button.querySelector<HTMLSpanElement>("span");
+
+          if (icon) {
+            icon.textContent = data.favorite ? "♥" : "♡";
+          }
+
+          button.setAttribute(
+            "aria-label",
+            data.favorite
+              ? "Remove from favourites"
+              : "Add to favourites"
+          );
+        } catch (error) {
+          console.error("Favorite toggle error:", error);
+        } finally {
+          button.disabled = false;
+        }
+      });
+    });
+</script>

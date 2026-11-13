@@ -1,0 +1,386 @@
+
+---
+import MainLayout from "../layouts/MainLayouts.astro";
+import WorkoutCard from "../components/WorkoutCard.astro";
+import { getWorkouts } from "../lib/workouts";
+
+const { workouts, error } = await getWorkouts({
+  request: Astro.request,
+  cookies: Astro.cookies,
+});
+---
+
+<MainLayout
+  title="Discover Workouts | PLAYDAY"
+  description="Find fun, short workouts for your mood and energy."
+>
+
+  <section class="section">
+    <div class="container">
+
+      <!-- PAGE INTRO -->
+
+      <p class="eyebrow">Find your movement</p>
+
+      <h1>What are we feeling today?</h1>
+
+      <p>
+        Pick your vibe. We'll find something doable.
+      </p>
+
+      <!-- MOOD SELECTOR -->
+
+      <div class="mood-grid" id="mood-selector">
+
+        <button
+          class="mood-option"
+          data-mood="low-energy"
+          aria-pressed="false"
+          type="button"
+        >
+          <span class="mood-emoji">☁️</span>
+          <strong>Low energy</strong>
+          <small>Keep it gentle</small>
+        </button>
+
+        <button
+          class="mood-option"
+          data-mood="playful"
+          aria-pressed="false"
+          type="button"
+        >
+          <span class="mood-emoji">🍒</span>
+          <strong>Playful</strong>
+          <small>Let's have fun</small>
+        </button>
+
+        <button
+          class="mood-option"
+          data-mood="need-a-reset"
+          aria-pressed="false"
+          type="button"
+        >
+          <span class="mood-emoji">✨</span>
+          <strong>Need a reset</strong>
+          <small>Stretch it out</small>
+        </button>
+
+        <button
+          class="mood-option"
+          data-mood="energetic"
+          aria-pressed="false"
+          type="button"
+        >
+          <span class="mood-emoji">🔥</span>
+          <strong>Full of energy</strong>
+          <small>Let's move</small>
+        </button>
+
+      </div>
+
+      <!-- FILTERS -->
+
+      <div class="filters">
+
+        <label for="duration-filter">
+          How much time?
+
+          <select id="duration-filter">
+            <option value="all">Any duration</option>
+            <option value="5">5 minutes or less</option>
+            <option value="10">10 minutes or less</option>
+            <option value="15">15 minutes or less</option>
+          </select>
+        </label>
+
+        <label for="difficulty-filter">
+          Difficulty
+
+          <select id="difficulty-filter">
+            <option value="all">All levels</option>
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+          </select>
+        </label>
+
+        <label for="equipment-filter">
+          Equipment
+
+          <select id="equipment-filter">
+            <option value="all">Any equipment</option>
+            <option value="none">No equipment</option>
+            <option value="mat">Mat</option>
+          </select>
+        </label>
+
+      </div>
+
+      <!-- RECOMMENDATION -->
+
+      <div id="recommendation" hidden>
+
+        <p class="eyebrow">Your little recommendation</p>
+
+        <div id="recommendation-content"></div>
+
+      </div>
+
+      <!-- WORKOUTS -->
+
+      <div class="section-heading">
+
+        <h2>Find your next tiny win.</h2>
+
+        <p>
+          {workouts.length} workouts ready to explore.
+        </p>
+
+      </div>
+
+      {error ? (
+
+        <p role="alert">{error}</p>
+
+      ) : workouts.length > 0 ? (
+
+        <div class="workout-grid" id="workout-grid">
+
+          {workouts.map((workout) => (
+
+            <div
+              class="workout-item"
+              data-id={workout.id}
+              data-moods={workout.mood_tags.join(",")}
+              data-duration={workout.duration_minutes}
+              data-difficulty={workout.difficulty}
+              data-equipment={workout.equipment.join(",")}
+            >
+
+              <WorkoutCard workout={workout} />
+
+            </div>
+
+          ))}
+
+        </div>
+
+      ) : (
+
+        <p>
+          No workouts are available yet. Check back soon!
+        </p>
+
+      )}
+
+      <!-- FILTER RESULTS MESSAGE -->
+
+      <p id="filter-message" role="status" aria-live="polite"></p>
+
+    </div>
+  </section>
+
+</MainLayout>
+
+<script>
+  // =====================================
+  // GET PAGE ELEMENTS
+  // =====================================
+
+  function getElement<T extends Element>(selector: string): T {
+    const element = document.querySelector<T>(selector);
+
+    if (!element) {
+      throw new Error(`PLAYDAY: Element not found: ${selector}`);
+    }
+
+    return element;
+  }
+
+  const moodButtons =
+    document.querySelectorAll<HTMLButtonElement>("[data-mood]");
+
+  const durationFilter =
+    getElement<HTMLSelectElement>("#duration-filter");
+
+  const difficultyFilter =
+    getElement<HTMLSelectElement>("#difficulty-filter");
+
+  const equipmentFilter =
+    getElement<HTMLSelectElement>("#equipment-filter");
+
+  const workoutItems =
+    document.querySelectorAll<HTMLElement>(".workout-item");
+
+  const recommendation =
+    getElement<HTMLElement>("#recommendation");
+
+  const recommendationContent =
+    getElement<HTMLElement>("#recommendation-content");
+
+  const filterMessage =
+    getElement<HTMLParagraphElement>("#filter-message");
+
+
+  // =====================================
+  // SELECTED MOOD
+  // =====================================
+
+  let selectedMood = "";
+
+
+  // =====================================
+  // FILTER WORKOUTS
+  // =====================================
+
+  function filterWorkouts() {
+
+    const maxDuration = durationFilter.value;
+
+    const difficulty = difficultyFilter.value;
+
+    const equipment = equipmentFilter.value;
+
+    const visibleWorkouts: HTMLElement[] = [];
+
+
+    workoutItems.forEach((item) => {
+
+      // Workout information
+
+      const duration =
+        Number(item.dataset.duration ?? 0);
+
+      const moods =
+        (item.dataset.moods ?? "").split(",");
+
+      const equipmentList =
+        (item.dataset.equipment ?? "").split(",");
+
+
+      // Check selected filters
+
+      const matchesMood =
+        !selectedMood || moods.includes(selectedMood);
+
+      const matchesDuration =
+        maxDuration === "all" ||
+        duration <= Number(maxDuration);
+
+      const matchesDifficulty =
+        difficulty === "all" ||
+        item.dataset.difficulty === difficulty;
+
+      const matchesEquipment =
+        equipment === "all" ||
+        equipmentList.includes(equipment);
+
+
+      // Decide whether to show workout
+
+      const shouldShow =
+        matchesMood &&
+        matchesDuration &&
+        matchesDifficulty &&
+        matchesEquipment;
+
+
+      // Show or hide workout
+
+      item.hidden = !shouldShow;
+
+
+      if (shouldShow) {
+        visibleWorkouts.push(item);
+      }
+
+    });
+
+
+    // =====================================
+    // UPDATE RESULTS COUNTER
+    // =====================================
+
+    filterMessage.textContent =
+      `${visibleWorkouts.length} workouts found.`;
+
+
+    // =====================================
+    // WORKOUT RECOMMENDATION
+    // =====================================
+
+    if (selectedMood && visibleWorkouts.length > 0) {
+
+      const firstWorkout = visibleWorkouts[0];
+
+      const title =
+        firstWorkout.querySelector("h3")?.textContent?.trim();
+
+      recommendationContent.textContent =
+        `We think ${title || "this workout"} could be a lovely place to start.`;
+
+      recommendation.hidden = false;
+
+    } else {
+
+      recommendation.hidden = true;
+
+    }
+
+  }
+
+
+  // =====================================
+  // MOOD BUTTON EVENTS
+  // =====================================
+
+  moodButtons.forEach((button) => {
+
+    button.addEventListener("click", () => {
+
+      // Update selected mood
+
+      selectedMood = button.dataset.mood ?? "";
+
+
+      // Update button appearance/accessibility
+
+      moodButtons.forEach((otherButton) => {
+
+        otherButton.setAttribute(
+          "aria-pressed",
+          String(otherButton === button)
+        );
+
+      });
+
+
+      // Apply filters
+
+      filterWorkouts();
+
+    });
+
+  });
+
+
+  // =====================================
+  // FILTER EVENT LISTENERS
+  // =====================================
+
+  durationFilter.addEventListener(
+    "change",
+    filterWorkouts
+  );
+
+  difficultyFilter.addEventListener(
+    "change",
+    filterWorkouts
+  );
+
+  equipmentFilter.addEventListener(
+    "change",
+    filterWorkouts
+  );
+
+</script>

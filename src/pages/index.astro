@@ -1,16 +1,186 @@
 ---
+import MainLayouts  from "../layouts/MainLayouts.astro";
+
+const features = [
+  {
+    icon: "♡",
+    title: "No gym intimidation",
+    description: "Move in your bedroom, living room or wherever you feel comfortable."
+  },
+  {
+    icon: "✿",
+    title: "Tiny workouts",
+    description: "Start with three minutes. You don't have to do an hour."
+  },
+  {
+    icon: "✧",
+    title: "Fun rewards",
+    description: "Collect little wins, XP and achievements as you go."
+  }
+];
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<MainLayouts
+  title="PLAYDAY — Make Movement Fun"
+  description="Find tiny, fun workouts that fit your mood, energy and everyday life."
+>
+
+  <!-- HERO -->
+
+  <section class="section">
+    <div class="container">
+
+      <div class="hero-grid">
+
+        <div class="hero-content">
+
+          <p class="eyebrow">
+            Your new favourite movement club
+          </p>
+
+          <h1>
+            A little movement.
+            <span> A lot of main character energy.</span>
+          </h1>
+
+          <p>
+            Forget the pressure to work out.
+            Find little movement adventures that
+            actually make you want to get up.
+          </p>
+
+          <div class="hero-actions">
+
+            <a href="/discover" class="button">
+              Find my workout →
+            </a>
+
+            <a href="#how-it-works" class="button button-secondary">
+              How it works
+            </a>
+
+          </div>
+
+          <p class="hero-note">
+            ♡ Beginner-friendly. Short. No pressure.
+          </p>
+
+        </div>
+
+        <div class="hero-image">
+
+          <img
+            src="/images/hero-girl-stretching.webp"
+            alt="Illustration of a person enjoying a gentle stretch"
+            fetchpriority="high"
+          />
+
+          <div class="hero-sticker">
+            Tiny wins count ✨
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+
+  <section class="section" id="how-it-works">
+
+    <div class="container">
+
+      <div class="section-heading">
+
+        <p class="eyebrow">The PLAYDAY way</p>
+
+        <h2>Working out, without the workout dread.</h2>
+
+      </div>
+
+      <div class="feature-grid">
+
+        {features.map((feature) => (
+
+          <article class="card feature-card">
+
+            <span class="feature-icon">
+              {feature.icon}
+            </span>
+
+            <h3>{feature.title}</h3>
+
+            <p>{feature.description}</p>
+
+          </article>
+
+        ))}
+
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- FEATURED WORKOUT -->
+
+  <section class="section">
+
+    <div class="container featured-section">
+
+      <div>
+        <p class="eyebrow">Your first tiny win</p>
+
+        <h2>
+          Five minutes.
+          That's all we're asking.
+        </h2>
+
+        <p>
+          Try a short, beginner-friendly movement break
+          and see how you feel.
+        </p>
+
+        <a href="/discover" class="button">
+          Explore workouts →
+        </a>
+      </div>
+
+      <img
+        src="/images/workout-desk-potato.webp"
+        alt="A person doing a gentle desk stretch"
+        loading="lazy"
+      />
+
+    </div>
+
+  </section>
+
+  <!-- FINAL CTA -->
+
+  <section class="section">
+
+    <div class="container">
+
+      <div class="cta-card">
+
+        <p class="eyebrow">Your invitation</p>
+
+        <h2>
+          You don't need motivation.
+          You just need a tiny start.
+        </h2>
+
+        <a href="/signup" class="button">
+          Join PLAYDAY ♡
+        </a>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</MainLayouts>

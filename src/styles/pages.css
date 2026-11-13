@@ -1,0 +1,128 @@
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 50px;
+  align-items: center;
+}
+
+.hero-content h1 {
+  font-size: clamp(48px, 6vw, 76px);
+  margin: 18px 0;
+}
+
+.hero-content h1 span {
+  color: var(--color-cherry);
+}
+
+.hero-content > p:not(.eyebrow) {
+  max-width: 520px;
+  color: var(--color-muted);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.hero-note {
+  margin-top: 24px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.hero-image {
+  position: relative;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: var(--color-blush);
+}
+
+.hero-image img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+}
+
+.hero-sticker {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: white;
+  color: var(--color-cherry);
+  font-weight: 700;
+}
+
+.section-heading {
+  max-width: 650px;
+  margin-bottom: 35px;
+}
+
+.section-heading h2 {
+  font-size: clamp(34px, 5vw, 52px);
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.feature-card {
+  padding: 30px;
+}
+
+.feature-icon {
+  font-size: 32px;
+  color: var(--color-cherry);
+}
+
+.featured-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: center;
+  padding: 40px;
+  background: var(--color-blush);
+  border-radius: var(--radius-xl);
+}
+
+.featured-section img {
+  width: 100%;
+  border-radius: var(--radius-lg);
+}
+
+.cta-card {
+  padding: 60px 25px;
+  border-radius: var(--radius-xl);
+  text-align: center;
+  background: var(--color-petal);
+}
+
+.cta-card h2 {
+  max-width: 650px;
+  margin: 20px auto 30px;
+  font-size: clamp(34px, 5vw, 55px);
+}
+
+@media (max-width: 768px) {
+  .hero-grid,
+  .featured-section {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-content h1 {
+    font-size: 48px;
+  }
+
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .featured-section {
+    padding: 24px;
+  }
+}

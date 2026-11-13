@@ -1,0 +1,96 @@
+---
+import MainLayouts from "../layouts/MainLayouts.astro";
+import { createClient } from "../lib/supabase";
+
+const supabase = createClient({
+  request: Astro.request,
+  cookies: Astro.cookies,
+});
+
+const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (!user) {
+  return Astro.redirect("/login");
+}
+
+const { data: latestCompletion } = await supabase
+  .from("workout_completions")
+  .select("xp_earned")
+  .eq("user_id", user.id)
+  .order("completed_at", { ascending: false })
+  .limit(1)
+  .maybeSingle();
+
+const xp = latestCompletion?.xp_earned ?? 0;
+
+---
+
+<MainLayouts
+  title="Little Win Unlocked | PLAYDAY"
+  noIndex
+>
+
+  <section class="section">
+
+    <div class="container">
+
+      <div class="cta-card completion-card">
+
+        <img
+          src="/icons/sparkles.svg"
+          alt=""
+          width="60"
+          height="60"
+        />
+
+        <p class="eyebrow">YOU SHOWED UP!</p>
+
+        <h1>Look at you, superstar.</h1>
+
+        <p>
+          You made a little time for yourself.
+          That counts.
+        </p>
+
+        <div class="xp-reward">
+          +{xp} XP
+        </div>
+
+        <p>
+          One little win at a time.
+        </p>
+
+        <a href="/dashboard" class="button">
+          See my progress →
+        </a>
+
+        <a href="/discover" class="button button-secondary">
+          Find another workout
+        </a>
+
+      </div>
+
+    </div>
+
+  </section>
+
+</MainLayouts>
+<style>
+    .completion-card {
+  max-width: 700px;
+  margin-inline: auto;
+}
+
+.xp-reward {
+  display: inline-block;
+  margin: 25px 0;
+  padding: 20px 35px;
+  border-radius: 20px;
+  background: white;
+  color: var(--color-cherry);
+  font-size: 42px;
+  font-weight: 800;
+}
+</style>

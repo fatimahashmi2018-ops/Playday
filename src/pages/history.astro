@@ -1,0 +1,354 @@
+
+---
+import MainLayouts from "../layouts/MainLayouts.astro";
+import { createClient } from "../lib/supabase";
+
+const supabase = createClient({
+  request: Astro.request,
+  cookies: Astro.cookies,
+});
+
+const {
+  data: { user },
+  error: userError,
+} = await supabase.auth.getUser();
+
+if (userError || !user) {
+  return Astro.redirect("/login");
+}
+
+const { data: history, error } = await supabase
+  .from("workout_completions")
+  .select(`
+    id,
+    workout_id,
+    duration_seconds,
+    xp_earned,
+    completed_at,
+    workouts (
+      title,
+      image_path,
+      slug
+    )
+  `)
+  .eq("user_id", user.id)
+  .order("completed_at", { ascending: false });
+
+---
+
+<MainLayouts title="Workout History | PLAYDAY" noIndex>
+  <section class="section">
+    <div class="container">
+
+      <p class="eyebrow">LOOK HOW FAR YOU'VE COME</p>
+
+      <h1>Your movement memories. ♡</h1>
+
+      {error ? (
+        <p role="alert">
+          Unable to load your history.
+        </p>
+      ) : history && history.length > 0 ? (
+
+        <div class="recent-list">
+
+          {history.map((item) => {
+            const workout = Array.isArray(item.workouts)
+              ? item.workouts[0]
+              : item.workouts;
+
+            return (
+              <article class="card recent-item">
+
+                <div>
+                  <h3>
+                    {workout?.title ?? "Workout"}
+                  </h3>
+
+                  <p>
+                    {Math.round(item.duration_seconds / 60)} minutes
+                    · {item.xp_earned} XP
+                  </p>
+
+                  <small>
+                    {new Date(item.completed_at).toLocaleString()}
+                  </small>
+                </div>
+
+                <a
+                  href={`/workout/${item.workout_id}`}
+                  class="button button-secondary"
+                >
+                  Do it again
+                </a>
+
+              </article>
+            );
+          })}
+
+        </div>
+
+      ) : (
+
+        <div class="card empty-state">
+          <h2>Your story starts here.</h2>
+
+          <p>
+            Complete your first workout to see it here.
+          </p>
+
+          <a href="/discover" class="button">
+            Find a workout
+          </a>
+        </div>
+
+      )}
+
+    </div>
+  </section>
+</MainLayouts>
+
+<style>
+
+/* =====================================
+   WORKOUT HISTORY PAGE
+===================================== */
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 35px;
+  max-width: 900px;
+}
+
+/* =====================================
+   PAGE HEADING
+===================================== */
+
+.container > .eyebrow {
+  margin-bottom: 12px;
+}
+
+.container > h1 {
+  max-width: 750px;
+  margin: 15px 0 35px;
+  font-size: clamp(40px, 6vw, 64px);
+  color: var(--color-chocolate);
+}
+
+/* =====================================
+   HISTORY ITEM
+===================================== */
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+
+  padding: 25px 30px;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+
+  background: var(--color-white);
+  box-shadow: var(--shadow-soft);
+
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.recent-item:hover {
+  transform: translateY(-3px);
+  border-color: var(--color-petal);
+  box-shadow: 0 12px 35px rgba(105, 58, 75, 0.10);
+}
+
+/* =====================================
+   WORKOUT DETAILS
+===================================== */
+
+.recent-item h3 {
+  margin: 0 0 10px;
+
+  font-family: var(--font-heading);
+  font-size: 27px;
+  font-weight: 400;
+  line-height: 1.2;
+
+  color: var(--color-chocolate);
+}
+
+.recent-item p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+
+  margin: 0 0 10px;
+
+  color: var(--color-cherry);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.recent-item small {
+  display: block;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+/* =====================================
+   REPEAT WORKOUT BUTTON
+===================================== */
+
+.recent-item .button {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 11px 22px;
+  font-size: 13px;
+
+  transition:
+    background 180ms ease,
+    transform 180ms ease;
+}
+
+.recent-item .button:hover {
+  background: var(--color-petal);
+  transform: translateY(-2px);
+}
+
+/* =====================================
+   EMPTY HISTORY STATE
+===================================== */
+
+.empty-state {
+  max-width: 700px;
+  margin: 45px auto 0;
+  padding: 65px 35px;
+
+  text-align: center;
+
+  background: var(--color-blush);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+
+  box-shadow: var(--shadow-soft);
+}
+
+.empty-state h2 {
+  margin: 0 0 15px;
+
+  font-size: clamp(32px, 5vw, 46px);
+  color: var(--color-cherry);
+}
+
+.empty-state p {
+  max-width: 420px;
+  margin: 0 auto 25px;
+
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.empty-state .button {
+  margin-top: 8px;
+}
+
+/* =====================================
+   ERROR MESSAGE
+===================================== */
+
+[role="alert"] {
+  max-width: 700px;
+  padding: 18px 22px;
+
+  color: var(--color-cherry);
+  background: var(--color-blush);
+
+  border: 1px solid var(--color-petal);
+  border-radius: var(--radius-md);
+
+  font-weight: 600;
+}
+
+/* =====================================
+   RESPONSIVE DESIGN
+===================================== */
+
+@media (max-width: 768px) {
+  .recent-list {
+    gap: 15px;
+    margin-top: 25px;
+  }
+
+  .recent-item {
+    padding: 22px;
+    gap: 18px;
+  }
+
+  .recent-item h3 {
+    font-size: 23px;
+  }
+
+  .empty-state {
+    padding: 45px 25px;
+  }
+}
+
+@media (max-width: 540px) {
+  .container > h1 {
+    font-size: 42px;
+    margin-bottom: 28px;
+  }
+
+  .recent-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+
+    padding: 22px;
+  }
+
+  .recent-item > div {
+    width: 100%;
+  }
+
+  .recent-item .button {
+    width: 100%;
+  }
+
+  .recent-item h3 {
+    font-size: 25px;
+  }
+
+  .empty-state {
+    padding: 40px 22px;
+  }
+
+  .empty-state .button {
+    width: 100%;
+  }
+}
+
+/* =====================================
+   ACCESSIBILITY
+===================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .recent-item,
+  .recent-item .button {
+    transition: none;
+  }
+
+  .recent-item:hover,
+  .recent-item .button:hover {
+    transform: none;
+  }
+}
+
+</style>

@@ -1,0 +1,60 @@
+---
+import "../styles/global.css";
+import "../styles/components.css";
+import "../styles/pages.css";
+
+import Navbar from "../components/Navbar.astro";
+import Footer  from "../components/Footer.astro";
+
+const {
+  title = "PLAYDAY — Tiny Moves, Big Glow",
+  description = "Movement that feels like fun, not a chore.",
+  noIndex = false,
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+
+    <title>{title}</title>
+
+    <meta
+      name="description"
+      content={description}
+    />
+
+    {noIndex && (
+      <meta name="robots" content="noindex,nofollow" />
+    )}
+
+    <meta name="theme-color" content="#FFF9F2" />
+
+    <link
+      rel="preconnect"
+      href="https://fonts.googleapis.com"
+    />
+
+    <link
+      rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin
+    />
+  </head>
+
+  <body>
+    <Navbar />
+
+    <main>
+      <slot />
+    </main>
+
+    <Footer />
+  </body>
+</html>

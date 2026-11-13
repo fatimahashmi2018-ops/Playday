@@ -1,0 +1,536 @@
+
+---
+import MainLayout from "../layouts/MainLayouts.astro";
+import { createClient } from "../lib/supabase";
+
+const supabase = createClient({
+  request: Astro.request,
+  cookies: Astro.cookies,
+});
+
+const {
+  data: { user },
+  error: userError,
+} = await supabase.auth.getUser();
+
+if (userError || !user) {
+  return Astro.redirect("/login");
+}
+
+const { data: profile } = await supabase
+  .from("profiles")
+  .select("*")
+  .eq("id", user.id)
+  .single();
+
+const equipmentOptions = ["none", "mat"];
+---
+
+<MainLayout title="My Profile | PLAYDAY" noIndex>
+  <section class="section">
+    <div class="container auth-container">
+      <div class="auth-card">
+        <p class="eyebrow">YOUR LITTLE CORNER</p>
+
+        <h1>My profile ♡</h1>
+
+        <form id="profile-form">
+          <label for="display-name">Display name</label>
+
+          <input
+            id="display-name"
+            name="display_name"
+            value={profile?.display_name ?? ""}
+            minlength="2"
+            maxlength="40"
+            required
+          />
+
+          <label for="duration">Preferred workout duration</label>
+
+          <select id="duration" name="preferred_duration">
+            <option value="3" selected={profile?.preferred_duration === 3}>
+              3 minutes
+            </option>
+            <option value="5" selected={profile?.preferred_duration === 5}>
+              5 minutes
+            </option>
+            <option value="10" selected={profile?.preferred_duration === 10}>
+              10 minutes
+            </option>
+            <option value="15" selected={profile?.preferred_duration === 15}>
+              15 minutes
+            </option>
+          </select>
+
+          <label for="experience">Experience</label>
+
+          <select id="experience" name="experience">
+            <option value="beginner" selected={profile?.experience === "beginner"}>
+              Beginner
+            </option>
+            <option value="intermediate" selected={profile?.experience === "intermediate"}>
+              Intermediate
+            </option>
+            <option value="advanced" selected={profile?.experience === "advanced"}>
+              Advanced
+            </option>
+          </select>
+
+          <fieldset>
+            <legend>Available equipment</legend>
+
+            {equipmentOptions.map((equipment) => (
+              <label>
+                <input
+                  type="checkbox"
+                  name="equipment"
+                  value={equipment}
+                  checked={profile?.equipment?.includes(equipment) ?? false}
+                />
+                {equipment === "none" ? "No equipment" : "Exercise mat"}
+              </label>
+            ))}
+          </fieldset>
+
+          <button type="submit" class="button">
+            Save my preferences
+          </button>
+
+          <p id="profile-message" role="status"></p>
+        </form>
+
+        <hr />
+
+        <form id="logout-form">
+          <button type="submit" class="button button-secondary">
+            Log out
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+</MainLayout>
+
+<script>
+  import { actions } from "astro:actions";
+
+  const form =
+    document.querySelector<HTMLFormElement>("#profile-form");
+
+  const message =
+    document.querySelector<HTMLParagraphElement>("#profile-message");
+
+  const logoutForm =
+    document.querySelector<HTMLFormElement>("#logout-form");
+
+  if (form && message) {
+    form.addEventListener("submit", async (event: SubmitEvent) => {
+      event.preventDefault();
+
+      const formData = new FormData(form);
+
+      const experience = String(formData.get("experience") ?? "");
+
+if (
+  !["beginner", "intermediate", "advanced"].includes(experience)
+) {
+  message.textContent = "Please select a valid experience level.";
+  return;
+}
+
+const equipment = formData
+  .getAll("equipment")
+  .map(String)
+  .filter((item): item is "none" | "mat" =>
+    item === "none" || item === "mat"
+  );
+
+const preferences = {
+  display_name: String(formData.get("display_name") ?? "").trim(),
+  preferred_duration: Number(
+    formData.get("preferred_duration")
+  ),
+  experience: experience as "beginner" | "intermediate" | "advanced",
+  equipment,
+};
+
+      const submitButton =
+        form.querySelector<HTMLButtonElement>('button[type="submit"]');
+
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = "Saving...";
+      }
+
+      message.textContent = "";
+
+      try {
+        const { data, error } =
+          await actions.updateProfile(preferences);
+
+        if (error) {
+          console.error("Profile update error:", error);
+          message.textContent =
+            error.message || "Unable to save preferences.";
+          return;
+        }
+
+        if (!data?.success) {
+          message.textContent =
+            data?.message || "Unable to save preferences.";
+          return;
+        }
+
+        message.textContent = "Your preferences are saved! ♡";
+      } catch (error) {
+        console.error("Profile error:", error);
+        message.textContent = "Something went wrong. Please try again.";
+      } finally {
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = "Save my preferences";
+        }
+      }
+    });
+  }
+
+  if (logoutForm) {
+    logoutForm.addEventListener("submit", async (event: SubmitEvent) => {
+      event.preventDefault();
+
+      const button =
+        logoutForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Logging out...";
+      }
+
+      try {
+        const { data, error } = await actions.signOut();
+
+        if (error || !data?.success) {
+          console.error("Logout error:", error);
+          if (button) {
+            button.disabled = false;
+            button.textContent = "Log out";
+          }
+          return;
+        }
+
+        window.location.href = "/";
+      } catch (error) {
+        console.error("Logout error:", error);
+        if (button) {
+          button.disabled = false;
+          button.textContent = "Log out";
+        }
+      }
+    });
+  }
+</script>
+
+<style>
+  /* =====================================
+     PLAYDAY — PROFILE PAGE
+  ===================================== */
+
+  .section {
+    min-height: 85vh;
+    padding: 90px 20px;
+    background: #fffaf6;
+  }
+
+  .auth-container {
+    width: 100%;
+    max-width: 680px;
+    margin: 0 auto;
+  }
+
+  .auth-card {
+    background: #ffffff;
+    padding: 48px;
+    border: 1px solid #f3e9e2;
+    border-radius: 28px;
+    box-shadow: 0 15px 50px rgba(82, 54, 40, 0.07);
+  }
+
+  /* =====================================
+     HEADINGS
+  ===================================== */
+
+  .eyebrow {
+    color: #e78378;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .auth-card h1 {
+    color: #302c2a;
+    font-size: clamp(32px, 5vw, 43px);
+    line-height: 1.15;
+    letter-spacing: -1.8px;
+    margin: 0 0 36px;
+    font-weight: 800;
+  }
+
+  /* =====================================
+     FORM LAYOUT
+  ===================================== */
+
+  #profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  #profile-form > label {
+    color: #49413d;
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 12px;
+  }
+
+  #profile-form input:not([type="checkbox"]),
+  #profile-form select {
+    width: 100%;
+    min-height: 52px;
+    padding: 0 16px;
+    border: 1.5px solid #eee5df;
+    border-radius: 13px;
+    background: #fffdfb;
+    color: #393330;
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      background 0.2s ease;
+  }
+
+  #profile-form input:not([type="checkbox"]):hover,
+  #profile-form select:hover {
+    border-color: #e9b6ad;
+  }
+
+  #profile-form input:not([type="checkbox"]):focus,
+  #profile-form select:focus {
+    border-color: #e78378;
+    background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(231, 131, 120, 0.12);
+  }
+
+  #profile-form select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a78b80' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    padding-right: 42px;
+  }
+
+  /* =====================================
+     EQUIPMENT OPTIONS
+  ===================================== */
+
+  #profile-form fieldset {
+    border: 1.5px solid #eee5df;
+    border-radius: 17px;
+    padding: 20px;
+    margin: 20px 0 12px;
+    background: #fffdfb;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  #profile-form legend {
+    padding: 0 9px;
+    color: #49413d;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  #profile-form fieldset label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #5b514c;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  #profile-form input[type="checkbox"] {
+    appearance: none;
+    width: 21px;
+    height: 21px;
+    min-width: 21px;
+    border: 1.5px solid #e5d8d0;
+    border-radius: 6px;
+    background: #ffffff;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: all 0.2s ease;
+  }
+
+  #profile-form input[type="checkbox"]:checked {
+    background: #e78378;
+    border-color: #e78378;
+  }
+
+  #profile-form input[type="checkbox"]:checked::after {
+    content: "✓";
+    color: white;
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  #profile-form input[type="checkbox"]:focus-visible {
+    outline: 3px solid rgba(231, 131, 120, 0.25);
+    outline-offset: 3px;
+  }
+
+  /* =====================================
+     SAVE BUTTON
+  ===================================== */
+
+  #profile-form button[type="submit"] {
+    width: 100%;
+    min-height: 54px;
+    margin-top: 12px;
+    border: none;
+    border-radius: 14px;
+    background: #e78378;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    transition:
+      transform 0.2s ease,
+      background 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  #profile-form button[type="submit"]:hover:not(:disabled) {
+    background: #d96f65;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(217, 111, 101, 0.2);
+  }
+
+  #profile-form button[type="submit"]:active {
+    transform: translateY(0);
+  }
+
+  #profile-form button:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  /* =====================================
+     STATUS MESSAGE
+  ===================================== */
+
+  #profile-message {
+    min-height: 20px;
+    margin: 5px 0 0;
+    color: #52866b;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  /* =====================================
+     LOGOUT SECTION
+  ===================================== */
+
+  .auth-card hr {
+    border: none;
+    border-top: 1px solid #f0e8e3;
+    margin: 32px 0 24px;
+  }
+
+  #logout-form {
+    margin: 0;
+  }
+
+  #logout-form button {
+    width: 100%;
+    min-height: 50px;
+    border: 1.5px solid #eee2dc;
+    border-radius: 13px;
+    background: #ffffff;
+    color: #8c6c63;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  #logout-form button:hover {
+    background: #fff3f0;
+    border-color: #e9b6ad;
+    color: #d96f65;
+  }
+
+  #logout-form button:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  /* =====================================
+     ACCESSIBILITY
+  ===================================== */
+
+  #profile-form button:focus-visible,
+  #logout-form button:focus-visible {
+    outline: 3px solid rgba(231, 131, 120, 0.35);
+    outline-offset: 4px;
+  }
+
+  /* =====================================
+     MOBILE RESPONSIVENESS
+  ===================================== */
+
+  @media (max-width: 600px) {
+    .section {
+      padding: 48px 16px;
+    }
+
+    .auth-card {
+      padding: 30px 22px;
+      border-radius: 22px;
+    }
+
+    .auth-card h1 {
+      font-size: 33px;
+      margin-bottom: 28px;
+    }
+
+    #profile-form fieldset {
+      padding: 17px;
+    }
+
+    #profile-form input:not([type="checkbox"]),
+    #profile-form select {
+      min-height: 50px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #profile-form *,
+    #logout-form * {
+      transition: none !important;
+    }
+  }
+</style>
+

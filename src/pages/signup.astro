@@ -1,0 +1,150 @@
+
+---
+import MainLayouts from "../layouts/MainLayouts.astro";
+import { createClient } from "../lib/supabase";
+
+const supabase = createClient({
+  request: Astro.request,
+  cookies: Astro.cookies,
+});
+
+const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+if (user) {
+  return Astro.redirect("/dashboard");
+}
+---
+
+<MainLayouts title="Join PLAYDAY" noIndex>
+  <section class="section">
+    <div class="container auth-container">
+      <div class="auth-card">
+        <p class="eyebrow">YOUR INVITATION</p>
+
+        <h1>Come join the club. ♡</h1>
+
+        <p>
+          Let's make movement a little more fun.
+        </p>
+
+        <form id="signup-form">
+          <label for="display-name">Your name</label>
+
+          <input
+            type="text"
+            id="display-name"
+            name="display_name"
+            placeholder="What should we call you?"
+            minlength="2"
+            maxlength="40"
+            autocomplete="name"
+            required
+          />
+
+          <label for="email">Email address</label>
+
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="you@example.com"
+            autocomplete="email"
+            required
+          />
+
+          <label for="password">Password</label>
+
+          <input
+            type="password"
+            id="password"
+            name="password"
+            minlength="8"
+            maxlength="72"
+            autocomplete="new-password"
+            required
+          />
+
+          <button class="button" type="submit">
+            Create my account →
+          </button>
+
+          <p id="auth-message" role="status" aria-live="polite"></p>
+        </form>
+
+        <p>
+          Already a member?
+          <a href="/login">Log in</a>
+        </p>
+      </div>
+    </div>
+  </section>
+</MainLayouts>
+
+
+<script>
+  import { actions } from "astro:actions";
+
+  const form = document.querySelector<HTMLFormElement>("#signup-form");
+  const message = document.querySelector<HTMLParagraphElement>(
+    "#auth-message"
+  );
+
+  if (!form || !message) {
+    throw new Error("Signup form elements could not be found.");
+  }
+
+  const button = form.querySelector<HTMLButtonElement>(
+    'button[type="submit"]'
+  );
+
+  if (!button) {
+    throw new Error("Signup button could not be found.");
+  }
+
+  const originalButtonText = "Create my account →";
+
+  form.addEventListener("submit", async (event: SubmitEvent) => {
+    event.preventDefault();
+
+    button.disabled = true;
+    button.textContent = "Creating your account...";
+    message.textContent = "";
+
+    try {
+      const formData = new FormData(form);
+      const { data, error } = await actions.signUp(formData);
+
+      if (error) {
+        console.error("Signup action error:", error);
+        message.textContent = error.message || "Signup failed. Please try again.";
+        button.disabled = false;
+        button.textContent = originalButtonText;
+        return;
+      }
+
+      if (!data?.success) {
+        message.textContent =
+          data?.message || "Something went wrong. Please try again.";
+        button.disabled = false;
+        button.textContent = originalButtonText;
+        return;
+      }
+
+      message.textContent =
+        "Signup completed! Please check your email to confirm your account.";
+
+      form.reset();
+      button.textContent = "Check your email ♡";
+      // Keep button disabled after successful signup.
+
+    } catch (error) {
+      console.error("Signup error:", error);
+      message.textContent = "Something went wrong. Please try again.";
+      button.disabled = false;
+      button.textContent = originalButtonText;
+    }
+  });
+</script>
+

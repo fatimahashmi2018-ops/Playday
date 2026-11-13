@@ -1,0 +1,67 @@
+
+---
+import MainLayout from "../layouts/MainLayouts.astro";
+import WorkoutCard from "../components/WorkoutCard.astro";
+import { createClient } from "../lib/supabase";
+
+const supabase = createClient({
+  request: Astro.request,
+  cookies: Astro.cookies,
+});
+
+const {
+  data: { user },
+  error: userError,
+} = await supabase.auth.getUser();
+
+if (userError || !user) {
+  return Astro.redirect("/login");
+}
+
+const { data: favorites, error } = await supabase
+  .from("favorites")
+  .select(`
+    workout_id,
+    workouts (*)
+  `)
+  .eq("user_id", user.id)
+  .order("created_at", { ascending: false });
+
+const favoriteWorkouts = (favorites ?? [])
+  .map((favorite) => favorite.workouts)
+  .filter((workout) => workout !== null);
+---
+
+<MainLayout title="My Favourites | PLAYDAY" noIndex>
+  <section class="section">
+    <div class="container">
+      <p class="eyebrow">YOUR SAVED COLLECTION</p>
+
+      <h1>Workouts you love. ♡</h1>
+
+      {error ? (
+        <p role="alert">
+          We couldn't load your favourites.
+        </p>
+      ) : favoriteWorkouts.length > 0 ? (
+        <div class="workout-grid">
+          {favoriteWorkouts.map((workout) => (
+            <WorkoutCard workout={workout} />
+          ))}
+        </div>
+      ) : (
+        <div class="card empty-state">
+          <h2>No favourites yet.</h2>
+
+          <p>
+            Find something fun and save it for later.
+          </p>
+
+          <a href="/discover" class="button">
+            Discover workouts
+          </a>
+        </div>
+      )}
+    </div>
+  </section>
+</MainLayout>

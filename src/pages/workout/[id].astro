@@ -1,0 +1,1051 @@
+
+---
+export const prerender = false;
+import MainLayouts from "../../layouts/MainLayouts.astro";
+import { createClient } from "../../lib/supabase";
+
+const supabase = createClient({
+  request: Astro.request,
+  cookies: Astro.cookies,
+});
+
+const workoutId = Astro.params.id;
+
+const { data: workout, error } = await supabase
+  .from("workouts")
+  .select(`
+    *,
+    workout_exercises (
+      position,
+      reps,
+      exercises (
+        id,
+        name,
+        instructions,
+        duration_seconds,
+        image_path,
+        safety_note
+      )
+    )
+  `)
+  .eq("id", workoutId)
+  .eq("is_published", true)
+  .order("position", {
+    referencedTable: "workout_exercises",
+    ascending: true,
+  })
+  .maybeSingle();
+
+if (error || !workout) {
+  return new Response("Workout not found", {
+    status: 404,
+  });
+}
+
+type Exercise = {
+  id: string;
+  name: string;
+  instructions: string | null;
+  duration_seconds: number | null;
+  image_path: string | null;
+  safety_note: string | null;
+};
+
+type WorkoutExerciseRow = {
+  position: number;
+  reps: string | null;
+  exercises: Exercise | null;
+};
+
+type ExerciseWithReps = Exercise & {
+  reps: string | null;
+};
+
+const workoutRows =
+  (workout.workout_exercises ?? []) as unknown as WorkoutExerciseRow[];
+
+const exercises: ExerciseWithReps[] = workoutRows
+  .slice()
+  .sort((a: WorkoutExerciseRow, b: WorkoutExerciseRow) => {
+    return a.position - b.position;
+  })
+  .filter(
+    (item: WorkoutExerciseRow): item is WorkoutExerciseRow & {
+      exercises: Exercise;
+    } => item.exercises !== null
+  )
+  .map((item: WorkoutExerciseRow & { exercises: Exercise }) => ({
+    ...item.exercises,
+    reps: item.reps,
+  }));
+---
+
+<MainLayouts
+  title={`${workout.title} | PLAYDAY`}
+  description={workout.description ?? ""}
+  noIndex
+>
+  <section class="section">
+    <div class="container workout-player">
+
+      <a href="/discover" class="back-link">
+        ← Back to workouts
+      </a>
+
+      <div class="player-header">
+        <p class="eyebrow">
+          YOUR LITTLE MOVEMENT SESSION
+        </p>
+
+        <h1>{workout.title}</h1>
+
+        <p>{workout.description}</p>
+
+        <div class="workout-meta">
+          <span>{workout.duration_minutes} minutes</span>
+          <span>{workout.difficulty}</span>
+          <span>{workout.xp_reward} XP</span>
+        </div>
+      </div>
+
+      {exercises.length > 0 ? (
+        <div
+          class="timer-card"
+          id="workout-player"
+          data-workout-id={workout.id}
+          data-exercises={JSON.stringify(exercises)}
+        >
+          <div class="player-progress">
+            <span id="exercise-counter">
+              Exercise 1 of {exercises.length}
+            </span>
+
+            <span id="progress-percent">0%</span>
+          </div>
+
+          <div
+            class="progress-track"
+            role="progressbar"
+            aria-label="Workout progress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuenow="0"
+            id="workout-progress"
+          >
+            <div
+              class="progress-fill"
+              id="progress-fill"
+            ></div>
+          </div>
+
+          <div class="exercise-display">
+            <img
+              src={exercises[0].image_path || "/images/workout-placeholder.webp"}
+              alt=""
+              id="exercise-image"
+            />
+
+            <p class="eyebrow">CURRENT MOVE</p>
+
+            <h2 id="exercise-name">
+              {exercises[0].name}
+            </h2>
+
+            <p id="exercise-instructions">
+              {exercises[0].instructions ?? ""}
+            </p>
+
+            <p id="exercise-safety" class="safety-note">
+              {exercises[0].safety_note ?? ""}
+            </p>
+
+            {exercises[0].reps && (
+              <p id="exercise-reps">
+                {exercises[0].reps}
+              </p>
+            )}
+          </div>
+
+          <div class="timer-display" id="timer-display">
+            00:30
+          </div>
+
+          <div class="player-controls">
+            <button
+              type="button"
+              class="button button-secondary"
+              id="previous-button"
+              disabled
+            >
+              Previous
+            </button>
+
+            <button
+              type="button"
+              class="button"
+              id="start-button"
+            >
+              Start
+            </button>
+
+            <button
+              type="button"
+              class="button button-secondary"
+              id="next-button"
+            >
+              Skip
+            </button>
+          </div>
+
+          <p id="player-message" role="status" aria-live="polite">
+            Ready when you are. Take it at your own pace.
+          </p>
+
+          <button
+            type="button"
+            id="finish-button"
+            class="button"
+            hidden
+          >
+            Finish workout ♡
+          </button>
+        </div>
+      ) : (
+        <p>
+          This workout doesn't have exercises yet.
+        </p>
+      )}
+
+    </div>
+  </section>
+</MainLayouts>
+
+<script>
+  import { actions } from "astro:actions";
+
+  type Exercise = {
+    id: string;
+    name: string;
+    instructions: string | null;
+    duration_seconds: number | null;
+    image_path: string | null;
+    safety_note: string | null;
+    reps: string | null;
+  };
+
+  function getElement<T extends HTMLElement>(
+    selector: string
+  ): T {
+    const element = document.querySelector<T>(selector);
+
+    if (!element) {
+      throw new Error(`PLAYDAY: Missing element ${selector}`);
+    }
+
+    return element;
+  }
+
+  const player =
+    document.querySelector<HTMLElement>("#workout-player");
+
+  if (player) {
+    const exercises: Exercise[] = JSON.parse(
+      player.dataset.exercises ?? "[]"
+    );
+
+    const workoutId = player.dataset.workoutId ?? "";
+
+    if (exercises.length === 0 || !workoutId) {
+      console.error("PLAYDAY: Workout data is missing.");
+    } else {
+      let currentIndex = 0;
+      let remainingSeconds = 0;
+      let elapsedSeconds = 0;
+      let intervalId: ReturnType<typeof setInterval> | null = null;
+      let isRunning = false;
+
+      const timerDisplay =
+        getElement<HTMLDivElement>("#timer-display");
+
+      const exerciseName =
+        getElement<HTMLHeadingElement>("#exercise-name");
+
+      const exerciseInstructions =
+        getElement<HTMLParagraphElement>("#exercise-instructions");
+
+      const exerciseImage =
+        getElement<HTMLImageElement>("#exercise-image");
+
+      const exerciseSafety =
+        getElement<HTMLParagraphElement>("#exercise-safety");
+
+      const counter =
+        getElement<HTMLSpanElement>("#exercise-counter");
+
+      const progressFill =
+        getElement<HTMLDivElement>("#progress-fill");
+
+      const progressBar =
+        getElement<HTMLDivElement>("#workout-progress");
+
+      const progressPercent =
+        getElement<HTMLSpanElement>("#progress-percent");
+
+      const message =
+        getElement<HTMLParagraphElement>("#player-message");
+
+      const startButton =
+        getElement<HTMLButtonElement>("#start-button");
+
+      const previousButton =
+        getElement<HTMLButtonElement>("#previous-button");
+
+      const nextButton =
+        getElement<HTMLButtonElement>("#next-button");
+
+      const finishButton =
+        getElement<HTMLButtonElement>("#finish-button");
+
+      const repsElement =
+        document.querySelector<HTMLElement>("#exercise-reps");
+
+      function formatTime(seconds: number): string {
+        const minutes = Math.floor(seconds / 60);
+        const remaining = seconds % 60;
+
+        return `${String(minutes).padStart(2, "0")}:${String(remaining).padStart(2, "0")}`;
+      }
+
+      function stopTimer(): void {
+        if (intervalId !== null) {
+          clearInterval(intervalId);
+        }
+
+        intervalId = null;
+        isRunning = false;
+      }
+
+      function updateTimerDisplay(): void {
+        timerDisplay.textContent = formatTime(remainingSeconds);
+      }
+
+      function updateProgress(): void {
+        const progress = Math.round(
+          (currentIndex / exercises.length) * 100
+        );
+
+        progressFill.style.width = `${progress}%`;
+        progressPercent.textContent = `${progress}%`;
+
+        progressBar.setAttribute(
+          "aria-valuenow",
+          String(progress)
+        );
+
+        counter.textContent =
+          `Exercise ${currentIndex + 1} of ${exercises.length}`;
+      }
+
+      function showExercise(): void {
+        stopTimer();
+
+        const exercise = exercises[currentIndex];
+
+        remainingSeconds = exercise.duration_seconds ?? 30;
+
+        exerciseName.textContent = exercise.name;
+
+        exerciseInstructions.textContent =
+          exercise.instructions ?? "";
+
+        exerciseImage.src =
+          exercise.image_path || "/images/workout-placeholder.webp";
+
+        exerciseImage.alt = exercise.name;
+
+        exerciseSafety.textContent =
+          exercise.safety_note ?? "";
+
+        if (repsElement) {
+          repsElement.textContent = exercise.reps ?? "";
+          repsElement.hidden = !exercise.reps;
+        }
+
+        previousButton.disabled = currentIndex === 0;
+
+        startButton.disabled = false;
+        startButton.textContent = "Start";
+
+        nextButton.disabled = false;
+        nextButton.textContent =
+          currentIndex === exercises.length - 1
+            ? "Finish"
+            : "Skip";
+
+        finishButton.hidden = true;
+
+        message.textContent =
+          "Ready when you are. Take it at your own pace.";
+
+        updateTimerDisplay();
+        updateProgress();
+      }
+
+      function completeCurrentExercise(): void {
+        stopTimer();
+
+        if (currentIndex < exercises.length - 1) {
+          currentIndex++;
+
+          showExercise();
+
+          message.textContent =
+            "Lovely! Let's move on to the next one.";
+        } else {
+          progressFill.style.width = "100%";
+          progressPercent.textContent = "100%";
+          progressBar.setAttribute("aria-valuenow", "100");
+
+          counter.textContent =
+            `Exercise ${exercises.length} of ${exercises.length}`;
+
+          finishButton.hidden = false;
+          startButton.disabled = true;
+          nextButton.disabled = true;
+
+          message.textContent =
+            "You've reached the end! You're almost there.";
+        }
+      }
+
+      function tick(): void {
+        if (remainingSeconds > 0) {
+          remainingSeconds--;
+          elapsedSeconds++;
+        }
+
+        updateTimerDisplay();
+
+        if (remainingSeconds <= 0) {
+          completeCurrentExercise();
+        }
+      }
+
+      function startTimer(): void {
+        if (isRunning || startButton.disabled) {
+          return;
+        }
+
+        isRunning = true;
+        startButton.textContent = "Pause";
+
+        message.textContent =
+          "You've got this. Move comfortably.";
+
+        intervalId = setInterval(tick, 1000);
+      }
+
+      function pauseTimer(): void {
+        stopTimer();
+
+        startButton.textContent = "Resume";
+
+        message.textContent =
+          "Take your time. There's no rush.";
+      }
+
+      startButton.addEventListener("click", () => {
+        if (isRunning) {
+          pauseTimer();
+        } else {
+          startTimer();
+        }
+      });
+
+      nextButton.addEventListener("click", () => {
+        if (currentIndex < exercises.length - 1) {
+          currentIndex++;
+          showExercise();
+        } else {
+          completeCurrentExercise();
+        }
+      });
+
+      previousButton.addEventListener("click", () => {
+        if (currentIndex > 0) {
+          currentIndex--;
+          showExercise();
+        }
+      });
+
+      finishButton.addEventListener("click", async () => {
+        stopTimer();
+
+        finishButton.disabled = true;
+        finishButton.textContent = "Saving your little win...";
+
+        try {
+          const result = await actions.completeWorkout({
+            workout_id: workoutId,
+            duration_seconds: Math.max(elapsedSeconds, 30),
+          });
+
+          if (result.error || !result.data?.success) {
+            message.textContent =
+              result.data?.message ||
+              "We couldn't save your workout.";
+
+            finishButton.disabled = false;
+            finishButton.textContent = "Try again";
+
+            return;
+          }
+
+          const stats = result.data.result;
+
+          window.location.href =
+            `/workout-complete?xp=${stats.xp_earned}`;
+
+        } catch (error) {
+          console.error(error);
+
+          message.textContent =
+            "Something went wrong. Please try again.";
+
+          finishButton.disabled = false;
+          finishButton.textContent = "Try again";
+        }
+      });
+
+      showExercise();
+    }
+  }
+</script>
+
+<style>
+
+/* =====================================
+   WORKOUT PLAYER PAGE
+===================================== */
+
+.workout-player {
+  max-width: 950px;
+}
+
+/* =====================================
+   BACK LINK
+===================================== */
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-bottom: 35px;
+
+  color: var(--color-muted);
+  font-size: 14px;
+  font-weight: 700;
+
+  transition:
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.back-link:hover {
+  color: var(--color-cherry);
+  transform: translateX(-4px);
+}
+
+/* =====================================
+   PLAYER HEADER
+===================================== */
+
+.player-header {
+  max-width: 750px;
+  margin-bottom: 40px;
+}
+
+.player-header .eyebrow {
+  margin-bottom: 14px;
+}
+
+.player-header h1 {
+  margin: 0 0 18px;
+
+  font-size: clamp(42px, 6vw, 68px);
+  line-height: 1.1;
+
+  color: var(--color-chocolate);
+}
+
+.player-header > p:not(.eyebrow) {
+  max-width: 620px;
+  margin-bottom: 22px;
+
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+/* =====================================
+   WORKOUT META
+===================================== */
+
+.player-header .workout-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.player-header .workout-meta span {
+  display: inline-flex;
+  align-items: center;
+
+  padding: 8px 16px;
+
+  border-radius: 999px;
+  background: var(--color-blush);
+
+  color: var(--color-cherry);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* =====================================
+   TIMER CARD
+===================================== */
+
+.timer-card {
+  width: 100%;
+  max-width: 850px;
+
+  margin-inline: auto;
+  padding: 40px;
+
+  background: white;
+
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+
+  box-shadow: var(--shadow-soft);
+}
+
+/* =====================================
+   PLAYER PROGRESS
+===================================== */
+
+.player-progress {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+
+  margin-bottom: 13px;
+
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+#progress-percent {
+  color: var(--color-cherry);
+  font-weight: 800;
+}
+
+/* =====================================
+   PROGRESS BAR
+===================================== */
+
+.progress-track {
+  width: 100%;
+  height: 10px;
+
+  overflow: hidden;
+
+  background: var(--color-blush);
+  border-radius: 999px;
+}
+
+.progress-fill {
+  width: 0%;
+  height: 100%;
+
+  background: linear-gradient(
+    90deg,
+    var(--color-petal),
+    var(--color-cherry)
+  );
+
+  border-radius: 999px;
+
+  transition: width 350ms ease;
+}
+
+/* =====================================
+   EXERCISE DISPLAY
+===================================== */
+
+.exercise-display {
+  padding: 35px 0 20px;
+  text-align: center;
+}
+
+.exercise-display img {
+  width: 100%;
+  max-width: 420px;
+
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+
+  margin: 0 auto 30px;
+
+  border-radius: var(--radius-lg);
+  background: var(--color-blush);
+}
+
+.exercise-display .eyebrow {
+  margin-bottom: 10px;
+}
+
+.exercise-display h2 {
+  margin: 0 0 15px;
+
+  font-size: clamp(30px, 5vw, 42px);
+  line-height: 1.2;
+
+  color: var(--color-cherry);
+}
+
+.exercise-display > p:not(.eyebrow) {
+  max-width: 580px;
+  margin: 0 auto 15px;
+
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+/* =====================================
+   EXERCISE SAFETY NOTE
+===================================== */
+
+.exercise-display .safety-note:not(:empty) {
+  max-width: 580px;
+
+  margin: 20px auto 0;
+  padding: 14px 18px;
+
+  border-radius: var(--radius-md);
+
+  background: #FBE9DA;
+  color: #94613F;
+
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+/* =====================================
+   EXERCISE REPS
+===================================== */
+
+#exercise-reps:not([hidden]) {
+  display: inline-block;
+
+  margin-top: 10px;
+  padding: 9px 20px;
+
+  border-radius: 999px;
+
+  background: var(--color-sage);
+  color: #536D50;
+
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* =====================================
+   TIMER DISPLAY
+===================================== */
+
+.timer-display {
+  width: fit-content;
+  min-width: 240px;
+
+  margin: 20px auto 30px;
+  padding: 20px 35px;
+
+  text-align: center;
+
+  background: var(--color-blush);
+  border: 1px solid var(--color-petal);
+  border-radius: var(--radius-xl);
+
+  color: var(--color-cherry);
+
+  font-size: clamp(65px, 10vw, 95px);
+  font-weight: 800;
+  line-height: 1.2;
+
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -4px;
+}
+
+/* =====================================
+   PLAYER CONTROLS
+===================================== */
+
+.player-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+
+  margin-top: 15px;
+}
+
+.player-controls .button {
+  min-width: 125px;
+  min-height: 50px;
+  padding: 12px 24px;
+
+  font-size: 14px;
+}
+
+.player-controls #start-button {
+  min-width: 155px;
+  background: var(--color-cherry);
+  color: white;
+}
+
+.player-controls #start-button:hover {
+  background: #B63D60;
+}
+
+.player-controls button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* =====================================
+   PLAYER MESSAGE
+===================================== */
+
+#player-message {
+  max-width: 500px;
+
+  margin: 25px auto 0;
+
+  text-align: center;
+
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* =====================================
+   FINISH BUTTON
+===================================== */
+
+#finish-button:not([hidden]) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;
+  max-width: 300px;
+  min-height: 54px;
+
+  margin: 25px auto 0;
+  padding: 14px 25px;
+
+  border: none;
+  border-radius: 999px;
+
+  background: var(--color-cherry);
+  color: white;
+
+  font-size: 15px;
+  font-weight: 800;
+
+  box-shadow: 0 8px 20px rgba(201, 77, 112, 0.18);
+
+  transition:
+    transform 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+#finish-button:hover:not(:disabled) {
+  background: #B63D60;
+  transform: translateY(-3px);
+  box-shadow: 0 12px 25px rgba(201, 77, 112, 0.22);
+}
+
+#finish-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* =====================================
+   EMPTY EXERCISE STATE
+===================================== */
+
+.workout-player > p:not(.back-link) {
+  padding: 30px;
+
+  border-radius: var(--radius-lg);
+
+  background: var(--color-blush);
+  color: var(--color-muted);
+
+  text-align: center;
+}
+
+/* =====================================
+   RESPONSIVE TABLET
+===================================== */
+
+@media (max-width: 768px) {
+  .workout-player {
+    max-width: 100%;
+  }
+
+  .player-header {
+    margin-bottom: 30px;
+  }
+
+  .timer-card {
+    padding: 30px 24px;
+  }
+
+  .exercise-display {
+    padding-top: 28px;
+  }
+
+  .exercise-display img {
+    max-width: 100%;
+  }
+
+  .timer-display {
+    font-size: 76px;
+  }
+}
+
+/* =====================================
+   RESPONSIVE MOBILE
+===================================== */
+
+@media (max-width: 540px) {
+  .back-link {
+    margin-bottom: 25px;
+  }
+
+  .player-header h1 {
+    font-size: 43px;
+  }
+
+  .player-header > p:not(.eyebrow) {
+    font-size: 14px;
+  }
+
+  .player-header .workout-meta {
+    gap: 8px;
+  }
+
+  .player-header .workout-meta span {
+    padding: 7px 12px;
+    font-size: 11px;
+  }
+
+  .timer-card {
+    padding: 22px 17px;
+    border-radius: var(--radius-lg);
+  }
+
+  .player-progress {
+    font-size: 11px;
+  }
+
+  .progress-track {
+    height: 8px;
+  }
+
+  .exercise-display {
+    padding-top: 25px;
+  }
+
+  .exercise-display img {
+    aspect-ratio: 4 / 3;
+    margin-bottom: 24px;
+  }
+
+  .exercise-display h2 {
+    font-size: 32px;
+  }
+
+  .exercise-display > p:not(.eyebrow) {
+    font-size: 14px;
+  }
+
+  .timer-display {
+    min-width: 0;
+    width: 100%;
+
+    padding: 20px 10px;
+    margin: 20px auto 25px;
+
+    font-size: 68px;
+    letter-spacing: -3px;
+  }
+
+  .player-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .player-controls .button {
+    min-width: 0;
+    width: 100%;
+    padding: 12px 10px;
+    font-size: 13px;
+  }
+
+  .player-controls #start-button {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  #player-message {
+    margin-top: 20px;
+    font-size: 13px;
+  }
+
+  #finish-button:not([hidden]) {
+    max-width: 100%;
+  }
+}
+
+/* =====================================
+   ACCESSIBILITY
+===================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .back-link,
+  .progress-fill,
+  #finish-button {
+    transition: none;
+  }
+
+  .back-link:hover,
+  #finish-button:hover {
+    transform: none;
+  }
+}
+
+</style>

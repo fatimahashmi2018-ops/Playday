@@ -1,0 +1,39 @@
+---
+import { createClient } from "../../lib/supabase";
+
+const supabase = createClient({
+  request: Astro.request,
+  cookies: Astro.cookies,
+});
+
+const url = new URL(Astro.request.url);
+
+const tokenHash = url.searchParams.get("token_hash");
+const type = url.searchParams.get("type");
+
+if (tokenHash && type === "email") {
+
+  const { error } = await supabase.auth.verifyOtp({
+    token_hash: tokenHash,
+    type: "email",
+  });
+
+  if (!error) {
+    return Astro.redirect("/dashboard");
+  }
+
+}
+
+return Astro.redirect("/login?error=confirmation");
+---
+
+<html lang="en">
+  <head>
+    <title>Confirming your account | PLAYDAY</title>
+    <meta name="robots" content="noindex" />
+  </head>
+
+  <body>
+    <p>Confirming your PLAYDAY account...</p>
+  </body>
+</html>

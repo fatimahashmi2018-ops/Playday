@@ -1,0 +1,955 @@
+
+---
+import MainLayout from "../layouts/MainLayouts.astro";
+import { createClient } from "../lib/supabase";
+import { getWeeklyActivity } from "../lib/helpers";
+
+// =====================================
+// SUPABASE CLIENT
+// =====================================
+
+const supabase = createClient({
+  request: Astro.request,
+  cookies: Astro.cookies,
+});
+
+// =====================================
+// AUTHENTICATION
+// =====================================
+
+const {
+  data: { user },
+  error: authError,
+} = await supabase.auth.getUser();
+
+if (authError || !user) {
+  return Astro.redirect("/login");
+}
+
+// =====================================
+// FETCH DASHBOARD DATA
+// =====================================
+
+const [
+  profileResult,
+  recentResult,
+  activityResult,
+  favoritesResult,
+] = await Promise.all([
+
+  // User profile
+  supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single(),
+
+  // Latest five workouts
+  supabase
+    .from("workout_completions")
+    .select(`
+      id,
+      duration_seconds,
+      xp_earned,
+      completed_at,
+      workouts (
+        title,
+        image_path
+      )
+    `)
+    .eq("user_id", user.id)
+    .order("completed_at", { ascending: false })
+    .limit(5),
+
+  // All workout records for accurate statistics
+  supabase
+    .from("workout_completions")
+    .select("id, duration_seconds, completed_at")
+    .eq("user_id", user.id),
+
+  // Favorite count
+  supabase
+    .from("favorites")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id),
+
+]);
+
+const profile = profileResult.data;
+const completions = recentResult.data ?? [];
+const allCompletions = activityResult.data ?? [];
+
+const totalWorkouts = allCompletions.length;
+const totalFavorites = favoritesResult.count ?? 0;
+
+// =====================================
+// TOTAL WORKOUT MINUTES
+// =====================================
+
+const totalMinutes = Math.round(
+  allCompletions.reduce(
+    (sum, item) => sum + (item.duration_seconds ?? 0),
+    0
+  ) / 60
+);
+
+// =====================================
+// WEEKLY ACTIVITY
+// =====================================
+
+const weeklyActivity = getWeeklyActivity(allCompletions);
+
+const maxMinutes = Math.max(
+  10,
+  ...weeklyActivity.map((day) => day.minutes)
+);
+
+// =====================================
+// LEVEL PROGRESS
+// =====================================
+
+const totalXP = profile?.xp ?? 0;
+const currentLevel = profile?.level ?? 1;
+
+const xpProgress = totalXP % 100;
+const xpRemaining = 100 - xpProgress;
+
+const currentStreak = profile?.current_streak ?? 0;
+
+// =====================================
+// GREETING
+// =====================================
+
+const hour = new Date().getHours();
+
+const greeting =
+  hour < 12
+    ? "Good morning"
+    : hour < 17
+      ? "Good afternoon"
+      : "Good evening";
+---
+
+<MainLayout
+  title="My Playday | PLAYDAY"
+  noIndex
+>
+
+  <section class="section">
+
+    <div class="container dashboard">
+
+      <!-- =====================================
+           DASHBOARD HEADER
+      ====================================== -->
+
+      <div class="dashboard-heading">
+
+        <div class="heading-content">
+
+          <p class="eyebrow">
+            YOUR LITTLE CORNER
+          </p>
+
+          <h1>
+            {greeting}, {profile?.display_name || "bestie"} ♡
+          </h1>
+
+          <p class="heading-subtitle">
+            Every little bit of movement counts.
+            Look how far you've come!
+          </p>
+
+        </div>
+
+        <a
+          href="/profile"
+          class="button button-secondary"
+        >
+          My profile
+        </a>
+
+      </div>
+
+
+      <!-- =====================================
+           WEEKLY ACTIVITY
+      ====================================== -->
+
+      <section class="card weekly-card">
+
+        <div class="weekly-heading">
+
+          <div>
+            <p class="eyebrow">
+              YOUR LITTLE WINS
+            </p>
+
+            <h2>This week ✨</h2>
+
+            <p class="muted">
+              Every minute counts. Keep showing up!
+            </p>
+          </div>
+
+          <div class="weekly-total">
+            <strong>
+              {weeklyActivity.reduce(
+                (sum, day) => sum + day.minutes,
+                0
+              )}
+            </strong>
+            <span>minutes</span>
+          </div>
+
+        </div>
+
+        <div class="weekly-chart">
+
+          {weeklyActivity.map((day) => {
+
+            const height = day.minutes > 0
+              ? Math.max(
+                  5,
+                  (day.minutes / maxMinutes) * 100
+                )
+              : 0;
+
+            return (
+
+              <div class="chart-day">
+
+                <span class="chart-value">
+                  {day.minutes}m
+                </span>
+
+                <div class="chart-track">
+
+                  <div
+                    class="chart-bar"
+                    style={`height: ${height}%`}
+                  ></div>
+
+                </div>
+
+                <span class="chart-label">
+                  {day.label}
+                </span>
+
+              </div>
+
+            );
+
+          })}
+
+        </div>
+
+      </section>
+
+
+      <!-- =====================================
+           STATISTICS
+      ====================================== -->
+
+      <div class="stats-grid">
+
+        <article class="card stat-card">
+
+          <div class="stat-icon">🔥</div>
+
+          <p>Current streak</p>
+
+          <h2>{currentStreak}</h2>
+
+          <span>
+            Days showing up
+          </span>
+
+        </article>
+
+
+        <article class="card stat-card">
+
+          <div class="stat-icon">⭐</div>
+
+          <p>Total XP</p>
+
+          <h2>{totalXP}</h2>
+
+          <span>
+            Little wins collected
+          </span>
+
+        </article>
+
+
+        <article class="card stat-card">
+
+          <div class="stat-icon">💗</div>
+
+          <p>Workouts</p>
+
+          <h2>{totalWorkouts}</h2>
+
+          <span>
+            Sessions completed
+          </span>
+
+        </article>
+
+
+        <article class="card stat-card">
+
+          <div class="stat-icon">♡</div>
+
+          <p>Favourites</p>
+
+          <h2>{totalFavorites}</h2>
+
+          <span>
+            Saved for later
+          </span>
+
+        </article>
+
+      </div>
+
+
+      <!-- =====================================
+           LEVEL PROGRESS
+      ====================================== -->
+
+      <section class="card level-card">
+
+        <div class="level-info">
+
+          <p class="eyebrow">
+            YOUR CURRENT LEVEL
+          </p>
+
+          <h2>
+            Level {currentLevel} 🌷
+          </h2>
+
+          <p>
+            You're doing amazing. Keep collecting
+            your little wins!
+          </p>
+
+        </div>
+
+        <div class="level-progress">
+
+          <div class="level-progress-heading">
+
+            <strong>
+              Level {currentLevel}
+            </strong>
+
+            <span>
+              {xpProgress}/100 XP
+            </span>
+
+          </div>
+
+          <div class="progress-track">
+
+            <div
+              class="progress-fill"
+              style={`width: ${xpProgress}%`}
+            ></div>
+
+          </div>
+
+          <small>
+            Only {xpRemaining} XP until your next level ✨
+          </small>
+
+        </div>
+
+      </section>
+
+
+      <!-- =====================================
+           TOTAL TIME
+      ====================================== -->
+
+      <section class="card time-card">
+
+        <div class="time-icon">⏱️</div>
+
+        <div>
+          <p class="eyebrow">
+            TIME YOU'VE INVESTED IN YOURSELF
+          </p>
+
+          <h2>
+            {totalMinutes} minutes
+          </h2>
+
+          <p>
+            That's {Math.floor(totalMinutes / 60)} hours
+            and {totalMinutes % 60} minutes of movement.
+            Be proud of yourself!
+          </p>
+        </div>
+
+      </section>
+
+
+      <!-- =====================================
+           RECENT WORKOUTS
+      ====================================== -->
+
+      <section class="dashboard-section">
+
+        <div class="section-heading">
+
+          <div>
+            <p class="eyebrow">
+              LOOK AT YOU GO
+            </p>
+
+            <h2>Your recent little wins</h2>
+          </div>
+
+          <a href="/history">
+            See all →
+          </a>
+
+        </div>
+
+
+        {completions.length > 0 ? (
+
+          <div class="recent-list">
+
+            {completions.map((item) => (
+
+              <article class="card recent-item">
+
+                <div class="recent-workout-info">
+
+                  <div class="recent-icon">
+                    💗
+                  </div>
+
+                  <div>
+
+                    <strong>
+                      {item.workouts?.title ?? "Completed workout"}
+                    </strong>
+
+                    <p>
+                      {Math.round(item.duration_seconds / 60)}
+                      minutes · {item.xp_earned ?? 0} XP
+                    </p>
+
+                  </div>
+
+                </div>
+
+                <span class="recent-date">
+                  {new Date(item.completed_at).toLocaleDateString(
+                    "en-US",
+                    {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    }
+                  )}
+                </span>
+
+              </article>
+
+            ))}
+
+          </div>
+
+        ) : (
+
+          <div class="card empty-state">
+
+            <div class="empty-icon">🌸</div>
+
+            <h3>
+              Your first little win is waiting.
+            </h3>
+
+            <p>
+              Start with a five-minute workout.
+              You don't have to do it all at once.
+            </p>
+
+            <a href="/discover" class="button">
+              Find a workout
+            </a>
+
+          </div>
+
+        )}
+
+      </section>
+
+
+      <!-- =====================================
+           FINAL CALL TO ACTION
+      ====================================== -->
+
+      <section class="dashboard-cta">
+
+        <div>
+          <p class="eyebrow">
+            READY FOR ANOTHER LITTLE WIN?
+          </p>
+
+          <h2>
+            Your next chapter starts with one workout ♡
+          </h2>
+
+        </div>
+
+        <a href="/discover" class="button">
+          Find your next workout →
+        </a>
+
+      </section>
+
+    </div>
+
+  </section>
+
+</MainLayout>
+
+
+<!-- =====================================
+     DASHBOARD STYLES
+====================================== -->
+
+<style>
+
+.dashboard {
+  max-width: 1100px;
+}
+
+.dashboard-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+  margin-bottom: 35px;
+}
+
+.dashboard-heading h1 {
+  font-size: clamp(32px, 5vw, 48px);
+  margin-bottom: 12px;
+}
+
+.heading-subtitle {
+  color: var(--color-muted);
+  line-height: 1.7;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--color-cherry);
+  margin-bottom: 10px;
+}
+
+.muted {
+  color: var(--color-muted);
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+
+/* WEEKLY CHART */
+
+.weekly-card {
+  margin-bottom: 25px;
+  padding: 30px;
+}
+
+.weekly-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.weekly-heading h2 {
+  font-size: 28px;
+}
+
+.weekly-total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.weekly-total strong {
+  font-size: 32px;
+  color: var(--color-cherry);
+}
+
+.weekly-total span {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.weekly-chart {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 12px;
+  height: 190px;
+  margin-top: 25px;
+}
+
+.chart-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.chart-value {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-cherry);
+}
+
+.chart-track {
+  width: 100%;
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--color-blush);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.chart-bar {
+  width: 100%;
+  min-height: 0;
+  background: var(--color-cherry);
+  border-radius: 999px;
+  transition: height 400ms ease;
+}
+
+.chart-label {
+  font-weight: 700;
+}
+
+
+/* STATS */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+
+.stat-card {
+  padding: 23px;
+  position: relative;
+}
+
+.stat-icon {
+  font-size: 24px;
+  margin-bottom: 15px;
+}
+
+.stat-card h2 {
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 40px;
+  color: var(--color-cherry);
+  margin: 10px 0;
+}
+
+.stat-card p,
+.stat-card span {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+
+/* LEVEL */
+
+.level-card {
+  margin-top: 25px;
+  padding: 30px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 35px;
+}
+
+.level-card h2 {
+  font-size: 34px;
+  margin-bottom: 10px;
+}
+
+.level-info > p:last-child {
+  color: var(--color-muted);
+  line-height: 1.7;
+}
+
+.level-progress-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.level-progress-heading span {
+  color: var(--color-muted);
+}
+
+.progress-track {
+  height: 12px;
+  border-radius: 999px;
+  background: #F0DFE3;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-cherry);
+  border-radius: inherit;
+  transition: width 300ms ease;
+}
+
+.level-progress small {
+  display: block;
+  margin-top: 12px;
+  color: var(--color-muted);
+}
+
+
+/* TOTAL TIME */
+
+.time-card {
+  margin-top: 25px;
+  padding: 25px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.time-icon {
+  font-size: 35px;
+}
+
+.time-card h2 {
+  font-size: 28px;
+  color: var(--color-cherry);
+  margin: 5px 0;
+}
+
+.time-card p:last-child {
+  font-size: 13px;
+  color: var(--color-muted);
+  line-height: 1.7;
+}
+
+
+/* RECENT WORKOUTS */
+
+.dashboard-section {
+  margin-block: 45px;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.section-heading h2 {
+  font-size: 27px;
+}
+
+.section-heading a {
+  color: var(--color-cherry);
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.recent-list {
+  display: grid;
+  gap: 12px;
+}
+
+.recent-item {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+}
+
+.recent-workout-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.recent-icon {
+  width: 45px;
+  height: 45px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--color-blush);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.recent-item strong {
+  font-size: 14px;
+}
+
+.recent-item p {
+  color: var(--color-muted);
+  font-size: 13px;
+  margin-top: 5px;
+}
+
+.recent-date {
+  color: var(--color-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+
+/* EMPTY STATE */
+
+.empty-state {
+  padding: 40px 25px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 38px;
+  margin-bottom: 15px;
+}
+
+.empty-state h3 {
+  margin-bottom: 10px;
+}
+
+.empty-state p {
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+
+
+/* CTA */
+
+.dashboard-cta {
+  margin-top: 35px;
+  padding: 30px;
+  background: var(--color-blush);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+}
+
+.dashboard-cta h2 {
+  font-size: 25px;
+  max-width: 450px;
+  line-height: 1.4;
+}
+
+
+/* RESPONSIVE */
+
+@media (max-width: 800px) {
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .level-card {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+@media (max-width: 550px) {
+
+  .dashboard-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .weekly-card {
+    padding: 20px;
+  }
+
+  .weekly-chart {
+    gap: 7px;
+    height: 170px;
+  }
+
+  .chart-track {
+    height: 105px;
+  }
+
+  .chart-value {
+    font-size: 10px;
+  }
+
+  .stats-grid {
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 17px;
+  }
+
+  .stat-card h2 {
+    font-size: 32px;
+  }
+
+  .level-card {
+    padding: 22px;
+  }
+
+  .recent-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dashboard-cta {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 23px;
+  }
+
+  .dashboard-cta h2 {
+    font-size: 22px;
+  }
+
+  .time-card {
+    align-items: flex-start;
+  }
+
+}
+
+</style>
