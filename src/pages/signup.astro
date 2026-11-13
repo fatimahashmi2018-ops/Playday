@@ -148,3 +148,206 @@ if (user) {
   });
 </script>
 
+<style>
+
+/* ========================================
+   PLAYDAY — SIGNUP PAGE
+======================================== */
+
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 75vh;
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+/* Signup card */
+
+.auth-card {
+  width: 100%;
+  max-width: 480px;
+  padding: 48px 42px;
+  background: #ffffff;
+  border: 1px solid #f0dfe3;
+  border-radius: 32px;
+  box-shadow: 0 8px 30px rgba(105, 58, 75, 0.07);
+  text-align: center;
+}
+
+.auth-card .eyebrow {
+  margin-bottom: 16px;
+  color: #c94d70;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.auth-card h1 {
+  margin: 0 0 14px;
+  color: #49343c;
+  font-family: "DM Serif Display", serif;
+  font-size: clamp(2.2rem, 5vw, 2.8rem);
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+.auth-card > p {
+  color: #8e7880;
+  font-size: 0.98rem;
+  line-height: 1.7;
+}
+
+.auth-card > p:first-of-type {
+  margin-bottom: 32px;
+}
+
+/* Form */
+
+#signup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+#signup-form label {
+  margin-top: 10px;
+  color: #49343c;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+#signup-form input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  color: #49343c;
+  background: #fff9f2;
+  border: 1px solid #f0dfe3;
+  border-radius: 14px;
+  outline: none;
+  font: inherit;
+  font-size: 0.92rem;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+#signup-form input::placeholder {
+  color: #b19da4;
+}
+
+#signup-form input:hover {
+  border-color: #e8b4c5;
+}
+
+#signup-form input:focus {
+  background: #ffffff;
+  border-color: #c94d70;
+  box-shadow: 0 0 0 4px rgba(201, 77, 112, 0.1);
+}
+
+#signup-form input:focus-visible {
+  outline: none;
+}
+
+/* Signup button */
+
+#signup-form .button {
+  width: 100%;
+  min-height: 54px;
+  margin-top: 18px;
+  padding: 14px 24px;
+  color: #ffffff;
+  background: #c94d70;
+  border: none;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+#signup-form .button:hover:not(:disabled) {
+  background: #b83e61;
+  box-shadow: 0 6px 18px rgba(201, 77, 112, 0.2);
+  transform: translateY(-2px);
+}
+
+#signup-form .button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+#signup-form .button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Status message */
+
+#auth-message {
+  min-height: 20px;
+  margin: 8px 0 0;
+  color: #8e7880;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Login link */
+
+.auth-card > p:last-child {
+  margin: 28px 0 0;
+  color: #8e7880;
+  font-size: 0.9rem;
+}
+
+.auth-card > p:last-child a {
+  color: #c94d70;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.auth-card > p:last-child a:hover {
+  color: #a93658;
+  text-decoration: underline;
+}
+
+/* Responsive */
+
+@media (max-width: 600px) {
+  .auth-container {
+    min-height: auto;
+    padding: 28px 16px 48px;
+  }
+
+  .auth-card {
+    padding: 36px 24px;
+    border-radius: 24px;
+  }
+
+  .auth-card h1 {
+    font-size: 2.2rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .auth-card {
+    padding: 30px 18px;
+  }
+
+  .auth-card h1 {
+    font-size: 1.9rem;
+  }
+}
+
+</style>
